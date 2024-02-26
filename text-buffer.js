@@ -1,14 +1,14 @@
 class TextBuffer {
-  _buffer = [];
-  constructor(source) {
+  constructor(source, name) {
     this._row = 0;
     this._col = 0;
-    this.create(source);
-    this.mode = "insert";
-  }
-
-  scrollToTop() {
-    this._row = 0;
+    this._original = source;
+    this._buffer = [];
+    this.mode = "control";
+    this.name = name;
+    this._start = 0;
+    this._end = 0;
+    this.create();
   }
 
   get len() {
@@ -28,13 +28,11 @@ class TextBuffer {
 
   deleteCurrentLine() { }
 
-  scrollY(len = 1) {
-    this.start += len;
-    this.end += len;
-  }
-
-  create(source) {
-    this._buffer = source.split("\n");
+  create() {
+    /*
+     * TODO!:
+     * */
+    this._buffer = this._original.split("\n");
   }
 
   get buffer() {
@@ -95,6 +93,8 @@ class TextBuffer {
   moveY(pos) {
     if (this._row + pos >= 0 && this._row + pos < this.len - 1) {
       this._row += pos;
+
+      this._col = Math.min(this._col, this.rowLen);
     }
   }
 
@@ -160,7 +160,8 @@ class TextBuffer {
               this.mode = "insert";
               break;
             case "g":
-              this.scrollToTop();
+              this._row = 0;
+              this._col = 0;
               break;
             case "d":
               this.deleteCurrentLine();

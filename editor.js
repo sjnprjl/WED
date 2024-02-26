@@ -23,6 +23,11 @@ class Editor {
     if (this._renderContext) {
       this._renderContext.font = `${this._fontSize}px ${this._fontFamily}`;
       this._renderContext.textBaseline = "top";
+      /*
+       * TODO!:
+       * */
+      const { height: charHeight } = this.charWidthAndHeight("a");
+      this.charHeight = charHeight;
     }
 
     /*
@@ -31,7 +36,10 @@ class Editor {
      * */
     this._currentBuffer = null;
 
-    this._visibleLines = Math.floor(this._height / this._fontSize);
+    this._maxLineHeight = 0;
+    this._visibleLines = Math.floor(this._height / this.charHeight);
+    this._start = 0;
+    this._end = this._visibleLines;
   }
 
   /*
@@ -71,6 +79,10 @@ class Editor {
     if (!this._currentBuffer) {
       this._currentBuffer = buffer;
     }
+    if (!buffer.name) {
+      buffer.name = this._buffers.length;
+    }
+
     this._buffers.push(buffer);
   }
 
@@ -99,28 +111,37 @@ class Editor {
     const { width, height } = this.cursorCharWidthAndHeight();
     this._renderContext.fillStyle = this._cursorColor;
     this._renderContext.fillRect(
-      this._currentBuffer._col * width,
-      this._currentBuffer._row * height,
+      Math.min(this._currentBuffer._col, this._currentBuffer.rowLen) * width,
+
+      Math.min(this._currentBuffer._row, this._visibleLines - 1) * height,
       width,
       this._fontSize,
     );
   }
 
+  /*
+   * check for total line that is visible in the screen as per current settings.
+   * */
+
   display() {
     /*  */
     this._paintBackground();
-    const lines = Math.min(this._currentBuffer.len, this._visibleLines);
+
+    if (this._currentBuffer == null) return;
+
+    this._end = Math.max(this._visibleLines - 1, this._currentBuffer._row);
+    this._start = this._end - this._visibleLines + 1;
 
     this._paintCursor();
     let offsetY = 0;
-    for (let i = 0; i < lines; i++) {
+    for (let i = this._start; i <= this._end; i++) {
       const row = this._currentBuffer.rowAt(i);
       this._drawText(0, offsetY * this.charWidthAndHeight(row).height, row);
       offsetY++;
     }
   }
 
-  changeBufferTo(buffer) {
+  switchBufferTo(buffer) {
     this._currentBuffer = buffer;
   }
 
@@ -130,6 +151,6 @@ class Editor {
   }
 
   onKeydown(e) {
-    this._currentBuffer.input(e.key);
+    if (this._currentBuffer) this._currentBuffer.input(e.key);
   }
 }
