@@ -175,7 +175,9 @@ addEventListener("keydown", async (e) => {
     if (e.key === "o") {
       const [file] = await openFiles();
       const text = await readFile(file);
-      editor.addBuffer(new TextBuffer(text, file.name));
+      const newB = new TextBuffer(text, file.name);
+      editor.addBuffer(newB);
+      editor.switchBufferTo(newB);
     } else if (e.key == "r") {
       // alert("Your current is unsaved. It will get lost");
       window.location.reload();
