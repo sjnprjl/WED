@@ -91,7 +91,7 @@ class TextBuffer {
   }
 
   moveY(pos) {
-    if (this._row + pos >= 0 && this._row + pos < this.len - 1) {
+    if (this._row + pos >= 0 && this._row + pos < this.len) {
       this._row += pos;
 
       this._col = Math.min(this._col, this.rowLen);
