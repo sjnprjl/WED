@@ -1,201 +1,127 @@
-//
-const canvas = document.getElementById("editor");
-const ctx = canvas.getContext("2d");
+class Editor {
+  constructor({
+    width,
+    height,
+    cursorColor = Color.from("#ddd"),
+    lineColor = Color.from("#aaa"),
+    context: renderContext,
+    bg = Color.from("#000"),
+    fg = Color.from("#fff"),
+    fontSize = 15,
+    fontFamily = "Arial",
+  }) {
+    this._width = width;
+    this._height = height;
+    this._bg = bg;
+    this._fg = fg;
+    this._cursorColor = cursorColor;
+    this._lineColor = lineColor;
+    this._renderContext = renderContext;
+    this._buffers = [];
+    this._fontSize = fontSize;
+    this._fontFamily = fontFamily;
+    if (this._renderContext)
+      this._renderContext.font = `${this._fontSize}px ${this._fontFamily}`;
+    /*
+     *
+     * pointer to current buffer
+     * */
+    this._currentBuffer = null;
 
-const BG_COLOR = "#352F44";
-const FG_COLOR = "#fff";
-const F_SIZE = 15;
-const FONT = `${F_SIZE}px Roboto Mono`;
-
-let width, height;
-width = canvas.width = window.innerWidth;
-height = canvas.height = window.innerHeight;
-
-const CURSOR = {
-  row: 0,
-  col: 0,
-};
-
-const buffer = new TextBuffer(
-  `
-/*
- * Copyright (c) 2024 Sujan Parajuli
- * Permission is hereby granted, free of charge, to any person obtaining
- * a copy of this software and associated documentation files
- * (the "Software"), to deal in the Software without restriction, including
- * without limitation the rights to use, copy, modify, merge, publish,
- * distribute, sublicense, and/or sell copies of the Software, and to
- * permit persons to whom the Software is furnished to do so, subject to
- * the following conditions:
- *
- * The above copyright notice and this permission notice shall be
- * included in all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
- * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
- * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
- * LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
- * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
- * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
- */
-
-/*
- * NOTE: The implementation of the atof function is solely for educational
- * purposes. It has not been tested and should not be employed in any critical
- * or substantial projects.
- * */
-
-#ifndef _ATOF_H
-#define _ATOF_H
-
-#include <stdio.h>
-#define IS_DIGIT(c) (c >= '0' && c <= '9')
-#define TO_NUM(c) (c - '0')
-
-static double atof(char *);
-
-double atof(char *s) {
-  double res = 0.0;
-
-  char signed_bit = 0;
-
-  /*
-   * sign of exponent
-   * e-xx | e(+)?xx
-   * */
-  char se = 0;
-  int e = 0;
-  int ev = 0;
-
-  if ((char)s[0] == '-') {
-    signed_bit = 1;
-    s++;
+    this._visibleLines = Math.floor(this._height / this._fontSize);
   }
 
   /*
-   * basically if there is a leading 0s, skip it to the good part
+   * hex is either Color instance or string
+   * @Private
    * */
-  while (*s == '0') {
-    s++;
+  _setColor(hex, prop) {
+    if (typeof hex === "string") {
+      this[prop] = Color.from(hex);
+    } else if (hex instanceof Color) {
+      this[prop] = hex;
+    }
   }
 
-  /*
-   *
-   * */
-  while (IS_DIGIT(*s)) {
-    res = (res * 10) + TO_NUM(*s++);
-    //
+  set bg(hex) {
+    this._setColor(hex, "_bg");
+  }
+  set fg(hex) {
+    this._setColor(hex, "_fg");
   }
 
-  if (*s == '.') {
-    s++;
-    do {
-      e--;
-      res = (res * 10) + TO_NUM(*s++);
-      //
-    } while (IS_DIGIT(*s));
+  get bg() {
+    return this._bg;
+  }
+  get fg() {
+    return this._fg;
   }
 
-  if (*s == 'e' || *s == 'E') {
-    s++;
+  set context(context) {
+    this._renderContext = context;
+  }
+  get context() {
+    return this._renderContext;
+  }
 
-    if (*s == '+' || *s == '-') {
-      if (*s == '-') {
-        se = 1;
+  addBuffer(buffer) {
+    if (!this._currentBuffer) {
+      this._currentBuffer = buffer;
+    }
+    this._buffers.push(buffer);
+  }
+
+  _paintBackground() {
+    this._renderContext.fillStyle = this.bg.toString();
+    this._renderContext.fillRect(0, 0, this._width, this._height);
+  }
+
+  cursorTextMetr() {
+    const c = this._currentBuffer.currentChar;
+    return this._renderContext.measureText(c);
+  }
+
+  _paintCursor() {
+    const { width } = this.cursorTextMetr();
+    this._renderContext.fillStyle = this._cursorColor;
+    this._renderContext.fillRect(
+      this._currentBuffer._col * width,
+      this._currentBuffer._row * this._fontSize,
+      width,
+      this._fontSize,
+    );
+  }
+
+  display() {
+    /*  */
+    this._paintBackground();
+    const lines = Math.min(this._currentBuffer.len, this._visibleLines);
+
+    this._paintCursor();
+    let offsetY = 0;
+    for (let i = 0; i < lines; i++) {
+      let offsetX = 0;
+      const row = this._currentBuffer.row(i);
+      if (!row) continue;
+      for (let j = 0; j < row.length; j++) {
+        const characterSize = this._renderContext.measureText(row[j]).width;
+        this._drawText(
+          offsetX,
+          offsetY * this._fontSize + this._fontSize,
+          row[j],
+        );
+        offsetX += characterSize;
       }
-      s++;
-    }
-
-    do {
-      ev = (ev * 10) + TO_NUM(*s++);
-    } while (IS_DIGIT(*s));
-  }
-
-  e = e + (ev * (!se ? 1 : -1));
-
-  char e_loc = e;
-
-  while (e != 0) {
-    if (e < 0) {
-      res /= 10.0;
-      e++;
-    } else if (e > 0) {
-      res *= 10.0;
-      e--;
+      offsetY++;
     }
   }
 
-  if (signed_bit) {
-    res *= -1;
-  }
-  return res;
-}
-#endif // !_ATOF_H
-
-`,
-  Math.floor(height / F_SIZE),
-);
-
-function drawText(x, y, c) {
-  ctx.font = FONT;
-  ctx.fillStyle = FG_COLOR;
-  ctx.fillText(c, x, y);
-}
-
-function cursorMark(row, col, w, h) {
-  ctx.fillStyle = "rgba(255,255,255,0.8)";
-  ctx.fillRect(col, row, w, h);
-}
-
-function lineMark(row, col, w, h) {
-  ctx.fillStyle = "rgba(0, 0, 0, 0.2)";
-  ctx.fillRect(col, row, w, h);
-}
-
-function bg() {
-  ctx.fillStyle = BG_COLOR;
-  ctx.fillRect(0, 0, width, height);
-}
-
-function loop() {
-  //
-  bg();
-  let x = (y = 0);
-
-  lineMark((buffer.row - buffer.start) * F_SIZE, buffer.col, width, F_SIZE);
-  cursorMark(
-    (buffer.row - buffer.start) * F_SIZE,
-    buffer.col * ctx.measureText(buffer.currentChar).width,
-    buffer.mode === "insert" ? 2 : 10,
-    F_SIZE,
-  );
-
-  for (let i = buffer.start; i < buffer.end; i++) {
-    const rows = buffer.buffer[i];
-    x = 0;
-    for (let col = 0; col < rows.length; col++) {
-      const letter = rows[col];
-      drawText(x, y * F_SIZE + F_SIZE, letter);
-      x += ctx.measureText(letter).width;
-    }
-    y++;
+  changeBufferTo(buffer) {
+    this._currentBuffer = buffer;
   }
 
-  // buffer.buffer.forEach((row) => {
-  //   x = 0;
-  //   row.forEach((letter) => {
-  //     drawText(x, y * F_SIZE + F_SIZE, letter);
-  //     x += ctx.measureText(letter).width;
-  //   });
-  //   y++;
-  // });
-
-  requestAnimationFrame(loop);
+  _drawText(x, y, c) {
+    this._renderContext.fillStyle = this.fg;
+    this._renderContext.fillText(c, x, y);
+  }
 }
-
-loop();
-
-addEventListener("keydown", (e) => {
-  buffer.input(e.key);
-});
