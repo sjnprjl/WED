@@ -26,9 +26,12 @@ class Editor {
       /*
        * TODO!:
        * */
-      const { height: charHeight } = this.charWidthAndHeight("a");
-      this.charHeight = charHeight;
+      const { height: _charHeight, width: _charWidth } =
+        this.charWidthAndHeight("1");
+      this.charHeight = _charHeight;
+      this._charWidth = _charWidth;
     }
+    this._numberingWidth = this._charWidth ?? 0;
 
     /*
      *
@@ -111,12 +114,40 @@ class Editor {
     const { width, height } = this.cursorCharWidthAndHeight();
     this._renderContext.fillStyle = this._cursorColor;
     this._renderContext.fillRect(
+      this._numberingWidth +
       Math.min(this._currentBuffer._col, this._currentBuffer.rowLen) * width,
 
       Math.min(this._currentBuffer._row, this._visibleLines - 1) * height,
       width,
       this._fontSize,
     );
+
+    this._renderContext.fillStyle = new Color(0, 0, 0, 0.2);
+    this._renderContext.fillRect(
+      this._numberingWidth + 0,
+
+      Math.min(this._currentBuffer._row, this._visibleLines - 1) * height,
+      this._width,
+      this._fontSize,
+    );
+  }
+
+  _paintNumbering() {
+    this._renderContext.fillStyle = Color.from("#333").toString();
+    this._numberingWidth = this.charWidthAndHeight(this._end + "").width + 10;
+    this._renderContext.fillRect(
+      0,
+      0,
+      this.charWidthAndHeight(this._end + "").width,
+      this._height,
+    );
+    for (let i = this._start; i <= this._end; i++) {
+      this._drawText(
+        0,
+        (i - this._start) * this.charWidthAndHeight(i + 1).height,
+        i + 1,
+      );
+    }
   }
 
   /*
@@ -127,6 +158,8 @@ class Editor {
     /*  */
     this._paintBackground();
 
+    this._paintNumbering();
+
     if (this._currentBuffer == null) return;
 
     this._end = Math.max(this._visibleLines - 1, this._currentBuffer._row);
@@ -136,7 +169,11 @@ class Editor {
     let offsetY = 0;
     for (let i = this._start; i <= this._end; i++) {
       const row = this._currentBuffer.rowAt(i);
-      this._drawText(0, offsetY * this.charWidthAndHeight(row).height, row);
+      this._drawText(
+        this._numberingWidth,
+        offsetY * this.charWidthAndHeight(row).height,
+        row,
+      );
       offsetY++;
     }
   }
