@@ -162,8 +162,13 @@ class Editor {
 
     if (this._currentBuffer == null) return;
 
-    this._end = Math.max(this._visibleLines - 1, this._currentBuffer._row);
+    if (this._currentBuffer.len < this._visibleLines) {
+      this._end = this._currentBuffer.len - 1;
+    } else {
+      this._end = Math.max(this._visibleLines - 1, this._currentBuffer._row);
+    }
     this._start = this._end - this._visibleLines + 1;
+    if (this._start < 0) this._start = 0;
 
     this._paintCursor();
     let offsetY = 0;
