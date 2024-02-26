@@ -57,5 +57,5 @@ function loop() {
 loop();
 
 addEventListener("keydown", (e) => {
-  buffer.input(e.key);
+  editor.onKeydown(e);
 });

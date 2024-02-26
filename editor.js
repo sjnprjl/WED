@@ -128,4 +128,8 @@ class Editor {
     this._renderContext.fillStyle = this.fg;
     this._renderContext.fillText(c, x, y);
   }
+
+  onKeydown(e) {
+    this._currentBuffer.input(e.key);
+  }
 }
