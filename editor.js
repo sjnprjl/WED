@@ -20,8 +20,11 @@ class Editor {
     this._buffers = [];
     this._fontSize = fontSize;
     this._fontFamily = fontFamily;
-    if (this._renderContext)
+    if (this._renderContext) {
       this._renderContext.font = `${this._fontSize}px ${this._fontFamily}`;
+      this._renderContext.textBaseline = "top";
+    }
+
     /*
      *
      * pointer to current buffer
@@ -76,17 +79,28 @@ class Editor {
     this._renderContext.fillRect(0, 0, this._width, this._height);
   }
 
-  cursorTextMetr() {
-    const c = this._currentBuffer.currentChar;
+  textMetr(c) {
     return this._renderContext.measureText(c);
   }
 
+  charWidthAndHeight(c) {
+    const metr = this.textMetr(c);
+    return {
+      width: metr.width,
+      height: metr.fontBoundingBoxAscent + metr.fontBoundingBoxDescent,
+    };
+  }
+
+  cursorCharWidthAndHeight() {
+    return this.charWidthAndHeight(this._currentBuffer.currentChar);
+  }
+
   _paintCursor() {
-    const { width } = this.cursorTextMetr();
+    const { width, height } = this.cursorCharWidthAndHeight();
     this._renderContext.fillStyle = this._cursorColor;
     this._renderContext.fillRect(
       this._currentBuffer._col * width,
-      this._currentBuffer._row * this._fontSize,
+      this._currentBuffer._row * height,
       width,
       this._fontSize,
     );
@@ -100,18 +114,8 @@ class Editor {
     this._paintCursor();
     let offsetY = 0;
     for (let i = 0; i < lines; i++) {
-      let offsetX = 0;
-      const row = this._currentBuffer.row(i);
-      if (!row) continue;
-      for (let j = 0; j < row.length; j++) {
-        const characterSize = this._renderContext.measureText(row[j]).width;
-        this._drawText(
-          offsetX,
-          offsetY * this._fontSize + this._fontSize,
-          row[j],
-        );
-        offsetX += characterSize;
-      }
+      const row = this._currentBuffer.rowAt(i);
+      this._drawText(0, offsetY * this.charWidthAndHeight(row).height, row);
       offsetY++;
     }
   }
