@@ -1,22 +1,32 @@
 class TextBuffer {
   _buffer = [];
-  constructor(source, bufferEnd) {
-    this.row = 0;
-    this.col = 0;
+  constructor(source) {
+    this._row = 0;
+    this._col = 0;
     this.create(source);
     this.mode = "insert";
-    this.start = 0;
-    this.end = bufferEnd;
-    /*
-     * easier for to restart
-     * */
-    this.endFixed = bufferEnd;
   }
 
   scrollToTop() {
-    this.start = 0;
-    this.end = this.endFixed;
-    this.row = 0;
+    this._row = 0;
+  }
+
+  get len() {
+    return this.buffer.length;
+  }
+  get rowLen() {
+    return this.buffer[this._row].length;
+  }
+
+  row(index) {
+    return this.buffer[index];
+  }
+
+  deleteCurrentLine() {
+    const top = this.buffer.slice(0, this._row);
+    const bottom = this.buffer.slice(this._row + 1);
+
+    this._buffer = [...top, ...bottom];
   }
 
   scrollY(len = 1) {
@@ -46,25 +56,36 @@ class TextBuffer {
   }
 
   get currentChar() {
-    return this.buffer[this.row][this.col] ?? " ";
+    if (!this.buffer[this._row]) return " ";
+    return this.buffer[this._row][this._col];
   }
 
   addChar(c) {
-    const row = this.buffer[this.row];
+    let row = this.buffer[this._row];
+    if (row == undefined) {
+      this._buffer[this._row] = [];
+      row = this._buffer[this._row];
+    }
 
-    const left = row.slice(0, this.col);
-    const right = row.slice(this.col);
-    this.buffer[this.row] = [...left, c, ...right];
-    this.move(1, 0);
+    if (this._col > row.length) {
+      this._buffer[this._row].push(c);
+      // this.move(1, 0);
+      return;
+    }
+
+    const left = row.slice(0, this._col);
+    const right = row.slice(this._col);
+    this.buffer[this._row] = [...left, c, ...right];
+    this.moveX(1);
   }
 
   removeChar() {
-    if (this.col > 0) {
-      const row = this.buffer[this.row];
-      const left = row.slice(0, this.col - 1);
-      const right = row.slice(this.col);
-      this.buffer[this.row] = [...left, ...right];
-      this.move(-1, 0);
+    if (this._col > 0) {
+      const row = this.buffer[this._row];
+      const left = row.slice(0, this._col - 1);
+      const right = row.slice(this._col);
+      this.buffer[this._row] = [...left, ...right];
+      this.moveX(-1);
     }
   }
 
@@ -72,89 +93,52 @@ class TextBuffer {
    * split on enter
    * */
   splitBuffer() {
-    const row = this.buffer[this.row];
+    const row = this.buffer[this._row];
 
-    const left = row.slice(0, this.col);
-    const right = row.slice(this.col);
+    const left = row.slice(0, this._col);
+    const right = row.slice(this._col);
 
-    const r_a = this.buffer.slice(0, this.row);
-    const r_b = this.buffer.slice(this.row + 1);
+    const r_a = this.buffer.slice(0, this._row);
+    const r_b = this.buffer.slice(this._row + 1);
 
-    this.move(0, 1);
-    this.col = 0;
+    this._col = 0;
+    this.moveY(1);
     this._buffer = [...r_a, left, right, ...r_b];
   }
 
   moveColEnd() {
-    this.col = this.buffer[this.row].length;
+    this._col = this.buffer[this._row].length;
   }
 
   moveY(pos) {
-    if (
-      pos > 0 &&
-      this.row + pos >= this.end &&
-      this.end < this.buffer.length - 1
-    ) {
-      this.scrollY(pos);
-    } else if (pos < 0 && this.row + pos <= this.start && this.start > 0) {
-      this.scrollY(pos);
-    }
-
-    if (this.row + pos < this.buffer.length - 1 && this.row + pos >= 0) {
-      this.row += pos;
+    if (this._row + pos >= 0 && this._row + pos < this.len - 1) {
+      this._row += pos;
     }
   }
 
   moveX(pos) {
-    if (this.col + pos < this.buffer[this.row].length && this.col + pos >= 0) {
-      this.col += pos;
+    if (this._col + pos >= 0 && this._col + pos < this.rowLen) {
+      this._col += pos;
     }
-  }
-
-  move(x, y) {
-    this.moveX(x);
-    this.moveY(y);
-
-    if (this.col > this.buffer[this.row].length) {
-      this.col = this.buffer[this.row].length;
-    }
-
-    // this.row = n_row;
-    // this.col = n_col;
-
-    // if (n_row >= 0 && n_row < this.buffer.length - 1) this.row = n_row;
-    //
-    // if (n_col < 0 && this.row > 0) {
-    //   this.col = this.buffer[this.row--].length - 1;
-    // } else if (
-    //   n_col >= this.buffer[this.row].length &&
-    //   this.row < this.buffer.length - 1
-    // ) {
-    //   this.col = 0;
-    //   this.row++;
-    // } else {
-    //   this.col = n_col;
-    // }
   }
 
   input(key) {
     switch (key) {
       case "ArrowLeft":
-        return this.move(-1, 0);
+        return this.moveX(-1);
 
       case "ArrowRight":
-        return this.move(1, 0);
+        return this.moveX(1);
       case "ArrowUp":
-        return this.move(0, -1);
+        return this.moveY(-1);
 
       case "ArrowDown":
-        return this.move(0, 1);
+        return this.moveY(1);
 
       case "Enter":
         return this.splitBuffer();
       case "Escape":
         this.mode = "control";
-        this.move(-1, 0);
         return;
       case "Backspace":
         this.removeChar();
@@ -172,20 +156,21 @@ class TextBuffer {
               this.mode = "insert";
               break;
             case "j":
-              this.move(0, 1);
+              this.moveY(1);
               break;
             case "k":
-              this.move(0, -1);
+              this.moveY(-1);
             case "l":
             case "e":
-              this.move(1, 0);
+              this.moveX(1);
               break;
             case "h":
-              this.move(-1, 0);
+            case "b":
+              this.moveX(-1);
               break;
             case "a":
               this.mode = "insert";
-              this.move(1, 0);
+              this.moveX(1);
               break;
             case "o":
               this.moveColEnd();
@@ -194,6 +179,9 @@ class TextBuffer {
               break;
             case "g":
               this.scrollToTop();
+              break;
+            case "d":
+              this.deleteCurrentLine();
               break;
           }
 
