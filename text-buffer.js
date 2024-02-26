@@ -15,19 +15,18 @@ class TextBuffer {
     return this.buffer.length;
   }
   get rowLen() {
-    return this.buffer[this._row].length;
+    return this.currentRow.length;
   }
 
-  row(index) {
+  rowAt(index) {
     return this.buffer[index];
   }
 
-  deleteCurrentLine() {
-    const top = this.buffer.slice(0, this._row);
-    const bottom = this.buffer.slice(this._row + 1);
-
-    this._buffer = [...top, ...bottom];
+  get currentRow() {
+    return this.buffer[this._row];
   }
+
+  deleteCurrentLine() { }
 
   scrollY(len = 1) {
     this.start += len;
@@ -35,20 +34,7 @@ class TextBuffer {
   }
 
   create(source) {
-    let row = [];
-    for (let i = 0; i < source.length; i++) {
-      const c = source[i];
-      if (c === "\n") {
-        this._buffer.push(row);
-        row = [];
-        continue;
-      }
-      row.push(c);
-    }
-
-    if (row.length) this._buffer.push(row);
-
-    this.bufferEndCursor = row.length;
+    this._buffer = source.split("\n");
   }
 
   get buffer() {
@@ -57,53 +43,49 @@ class TextBuffer {
 
   get currentChar() {
     if (!this.buffer[this._row]) return " ";
-    return this.buffer[this._row][this._col];
+    return this.buffer[this._row][this._col] ?? " ";
   }
 
   addChar(c) {
-    let row = this.buffer[this._row];
-    if (row == undefined) {
-      this._buffer[this._row] = [];
-      row = this._buffer[this._row];
+    if (this._col === this.rowLen) {
+      this._buffer[this._row] += c;
+    } else {
+      const left = this.currentRow.substring(0, this._col);
+      const right = this.currentRow.substring(this._col);
+      this._buffer[this._row] = `${left}${c}${right}`;
     }
-
-    if (this._col > row.length) {
-      this._buffer[this._row].push(c);
-      // this.move(1, 0);
-      return;
-    }
-
-    const left = row.slice(0, this._col);
-    const right = row.slice(this._col);
-    this.buffer[this._row] = [...left, c, ...right];
     this.moveX(1);
   }
 
   removeChar() {
+    //
     if (this._col > 0) {
-      const row = this.buffer[this._row];
-      const left = row.slice(0, this._col - 1);
-      const right = row.slice(this._col);
-      this.buffer[this._row] = [...left, ...right];
+      const left = this.currentRow.substring(0, this._col - 1);
+      const right = this.currentRow.substring(this._col);
+      this._buffer[this._row] = `${left}${right}`;
       this.moveX(-1);
+    } else if (this._col == 0 && this._row > 0) {
+      this.moveY(-1);
+      this.moveX(this.rowLen);
+      this._buffer[this._row] += this._buffer[this._row + 1];
+      this._buffer[this._row + 1] = null;
+      /*
+       * TODO!:
+       * */
+      this._buffer = this._buffer.filter((each) => each !== null);
     }
   }
 
   /*
-   * split on enter
+   * split on enter key pressed
    * */
   splitBuffer() {
-    const row = this.buffer[this._row];
-
-    const left = row.slice(0, this._col);
-    const right = row.slice(this._col);
-
-    const r_a = this.buffer.slice(0, this._row);
-    const r_b = this.buffer.slice(this._row + 1);
-
-    this._col = 0;
+    const left = this.currentRow.substring(0, this._col);
+    const right = this.currentRow.substring(this._col);
+    this._buffer[this._row] = left;
+    this._buffer.splice(this._row + 1, 0, right);
     this.moveY(1);
-    this._buffer = [...r_a, left, right, ...r_b];
+    this._col = 0;
   }
 
   moveColEnd() {
@@ -117,7 +99,7 @@ class TextBuffer {
   }
 
   moveX(pos) {
-    if (this._col + pos >= 0 && this._col + pos < this.rowLen) {
+    if (this._col + pos >= 0 && this._col + pos < this.rowLen + 1) {
       this._col += pos;
     }
   }
