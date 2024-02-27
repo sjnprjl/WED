@@ -26,7 +26,7 @@ class TextBuffer {
     return this.buffer[this._row];
   }
 
-  deleteCurrentLine() { }
+  deleteCurrentLine() {}
 
   create() {
     /*
@@ -161,6 +161,10 @@ class TextBuffer {
               break;
             case "g":
               this._row = 0;
+              this._col = 0;
+              break;
+            case "G":
+              this._row = this.len - 1;
               this._col = 0;
               break;
             case "d":
